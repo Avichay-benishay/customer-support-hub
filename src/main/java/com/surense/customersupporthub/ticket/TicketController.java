@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.*;
 
 import com.surense.customersupporthub.ticket.dto.CreateTicketRequest;
 import com.surense.customersupporthub.ticket.dto.TicketResponse;
-
 import com.surense.customersupporthub.ticket.dto.UpdateTicketStatusRequest;
 
 import jakarta.validation.Valid;
@@ -23,27 +22,6 @@ public class TicketController {
 
     public TicketController(TicketService ticketService) {
         this.ticketService = ticketService;
-    }
-    
-    @PutMapping("/{id}/assign/{agentId}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public TicketResponse assignTicketToAgent(
-            @PathVariable Long id,
-            @PathVariable Long agentId) {
-
-        return ticketService.assignTicketToAgent(id, agentId);
-    }
-    
-    @PutMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('AGENT','ADMIN')")
-    public TicketResponse updateStatus(
-            @PathVariable Long id,
-            @Valid @RequestBody UpdateTicketStatusRequest request) {
-
-        return ticketService.updateStatus(
-                id,
-                request.status()
-        );
     }
 
     @PostMapping
@@ -63,13 +41,20 @@ public class TicketController {
 
         return ticketService.getMyTickets(jwt.getSubject());
     }
-    
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('CUSTOMER','AGENT','ADMIN')")
-    public TicketResponse getTicketById(@PathVariable Long id) {
-        return ticketService.getTicketById(id);
+    public TicketResponse getTicketById(
+            @PathVariable Long id,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        return ticketService.getTicketById(
+                id,
+                jwt.getSubject(),
+                jwt.getClaimAsString("role")
+        );
     }
-    
+
     @GetMapping
     @PreAuthorize("hasAnyRole('AGENT','ADMIN')")
     public List<TicketResponse> getTickets(
@@ -81,5 +66,29 @@ public class TicketController {
                 jwt.getClaimAsString("role"),
                 status
         );
+    }
+
+    @PutMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('AGENT','ADMIN')")
+    public TicketResponse updateStatus(
+            @PathVariable Long id,
+            @Valid @RequestBody UpdateTicketStatusRequest request,
+            @AuthenticationPrincipal Jwt jwt) {
+
+        return ticketService.updateStatus(
+                id,
+                request.status(),
+                jwt.getSubject(),
+                jwt.getClaimAsString("role")
+        );
+    }
+
+    @PutMapping("/{id}/assign/{agentId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public TicketResponse assignTicketToAgent(
+            @PathVariable Long id,
+            @PathVariable Long agentId) {
+
+        return ticketService.assignTicketToAgent(id, agentId);
     }
 }

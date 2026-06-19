@@ -4,17 +4,16 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import com.surense.customersupporthub.exception.BadRequestException;
+import com.surense.customersupporthub.exception.NotFoundException;
 import com.surense.customersupporthub.exception.UnauthorizedException;
 import com.surense.customersupporthub.ticket.dto.CreateTicketRequest;
 import com.surense.customersupporthub.ticket.dto.TicketResponse;
+import com.surense.customersupporthub.user.Role;
 import com.surense.customersupporthub.user.User;
 import com.surense.customersupporthub.user.UserRepository;
-import com.surense.customersupporthub.exception.NotFoundException;
-
-import com.surense.customersupporthub.exception.BadRequestException;
-import org.springframework.transaction.annotation.Transactional;
-import com.surense.customersupporthub.user.Role;
 
 @Service
 public class TicketService {
@@ -63,36 +62,59 @@ public class TicketService {
             String role,
             TicketStatus status) {
 
-    	if ("ADMIN".equals(role)) {
+        if ("ADMIN".equals(role)) {
+            List<Ticket> tickets = status == null
+                    ? ticketRepository.findAll()
+                    : ticketRepository.findByStatus(status);
 
-    	    List<Ticket> tickets = status == null
-    	            ? ticketRepository.findAll()
-    	            : ticketRepository.findByStatus(status);
+            return tickets.stream()
+                    .map(this::toResponse)
+                    .toList();
+        }
 
-    	    return tickets.stream()
-    	            .map(this::toResponse)
-    	            .toList();
-    	}
+        User agent = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UnauthorizedException("Authenticated user not found"));
 
-    	User agent = userRepository.findByUsername(username)
-    	        .orElseThrow(() -> new UnauthorizedException("Authenticated user not found"));
+        List<Ticket> tickets = status == null
+                ? ticketRepository.findByCustomerAgentId(agent.getId())
+                : ticketRepository.findByCustomerAgentIdAndStatus(agent.getId(), status);
 
-    	List<Ticket> tickets = status == null
-    	        ? ticketRepository.findByCustomerAgentId(agent.getId())
-    	        : ticketRepository.findByCustomerAgentIdAndStatus(agent.getId(), status);
-
-    	return tickets.stream()
-    	        .map(this::toResponse)
-    	        .toList();
+        return tickets.stream()
+                .map(this::toResponse)
+                .toList();
     }
-    public TicketResponse getTicketById(Long ticketId) {
+
+    @Transactional(readOnly = true)
+    public TicketResponse getTicketById(
+            Long ticketId,
+            String username,
+            String role) {
 
         Ticket ticket = ticketRepository.findById(ticketId)
                 .orElseThrow(() -> new NotFoundException("Ticket not found"));
 
+        validateAccess(ticket, username, role);
+
         return toResponse(ticket);
     }
-    
+
+    @Transactional
+    public TicketResponse updateStatus(
+            Long ticketId,
+            TicketStatus status,
+            String username,
+            String role) {
+
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new NotFoundException("Ticket not found"));
+
+        validateAccess(ticket, username, role);
+
+        ticket.setStatus(status);
+
+        return toResponse(ticketRepository.save(ticket));
+    }
+
     @Transactional
     public TicketResponse assignTicketToAgent(
             Long ticketId,
@@ -108,23 +130,44 @@ public class TicketService {
             throw new BadRequestException("User is not an agent");
         }
 
-        ticket.getCustomer().setAgent(agent);
+        User customer = ticket.getCustomer();
+        customer.setAgent(agent);
 
-        userRepository.save(ticket.getCustomer());
+        userRepository.save(customer);
 
         return toResponse(ticket);
     }
-    
-    public TicketResponse updateStatus(
-            Long ticketId,
-            TicketStatus status) {
 
-        Ticket ticket = ticketRepository.findById(ticketId)
-                .orElseThrow(() -> new NotFoundException("Ticket not found"));
+    private void validateAccess(
+            Ticket ticket,
+            String username,
+            String role) {
 
-        ticket.setStatus(status);
+        if ("ADMIN".equals(role)) {
+            return;
+        }
 
-        return toResponse(ticketRepository.save(ticket));
+        User authenticatedUser = userRepository.findByUsername(username)
+                .orElseThrow(() -> new UnauthorizedException("Authenticated user not found"));
+
+        if ("CUSTOMER".equals(role)) {
+            if (!ticket.getCustomer().getId().equals(authenticatedUser.getId())) {
+                throw new UnauthorizedException("Access denied");
+            }
+            return;
+        }
+
+        if ("AGENT".equals(role)) {
+            User customer = ticket.getCustomer();
+
+            if (customer.getAgent() == null ||
+                    !customer.getAgent().getId().equals(authenticatedUser.getId())) {
+                throw new UnauthorizedException("Access denied");
+            }
+            return;
+        }
+
+        throw new UnauthorizedException("Access denied");
     }
 
     private TicketResponse toResponse(Ticket ticket) {
