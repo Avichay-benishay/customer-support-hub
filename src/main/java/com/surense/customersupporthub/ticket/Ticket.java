@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 @Entity
+@Table(name = "tickets")
 @Getter
 @Setter
 public class Ticket {

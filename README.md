@@ -6,17 +6,33 @@ Customer Support Hub is a secure backend service built with Spring Boot.
 
 The system manages customers, agents, and support tickets while enforcing role-based access control using JWT authentication.
 
-Three user roles are supported:
+The application supports three roles:
 
-- ADMIN
-- AGENT
-- CUSTOMER
+* ADMIN
+* AGENT
+* CUSTOMER
 
 Customers can create and track support tickets.
 
-Agents can manage their assigned customers and monitor their tickets.
+Agents can manage their assigned customers and view their tickets.
 
 Admins have full access to all customers and tickets.
+
+---
+
+## Technology Stack
+
+| Category | Technology |
+|-----------|------------|
+| Language | Java 21 |
+| Framework | Spring Boot 3.5 |
+| Security | Spring Security, JWT |
+| Persistence | Spring Data JPA, Hibernate |
+| Database | MySQL 8.4 |
+| Build Tool | Maven |
+| Testing | JUnit 5, Mockito |
+| Containerization | Docker, Docker Compose |
+
 
 ---
 
@@ -24,55 +40,39 @@ Admins have full access to all customers and tickets.
 
 ### Authentication & Security
 
-- JWT Authentication
-- Stateless Security
-- Role-Based Authorization
-- Spring Security
-- Protected REST APIs
+* JWT Authentication
+* Stateless Security
+* Role-Based Authorization
+* Spring Security
+* BCrypt Password Hashing
+* Protected REST APIs
 
 ### Customer Management
 
-- Create Customer
-- View Customers
-- View Personal Profile
-- Update Personal Profile
+* Create Customer
+* View Customers
+* View Personal Profile
+* Update Personal Profile
 
 ### Ticket Management
 
-- Create Ticket
-- View My Tickets
-- View All Tickets
-- Filter Tickets By Status
-- View Ticket By ID
-- Update Ticket Status
-- Assign Ticket To Agent
+* Create Ticket
+* View My Tickets
+* View All Tickets
+* Filter Tickets By Status
+* View Ticket By ID
+* Update Ticket Status
+* Assign Ticket To Agent
 
 ### Error Handling
 
 Centralized exception handling using:
 
-- BadRequestException
-- UnauthorizedException
-- ConflictException
-- NotFoundException
-
----
-
-## Technology Stack
-
-| Technology | Version |
-|------------|----------|
-| Java | 21 |
-| Spring Boot | 3.5 |
-| Spring Security | 6 |
-| Spring Data JPA | Latest |
-| Hibernate | 6 |
-| MySQL | 8.4 |
-| Maven | 3 |
-| Docker | Latest |
-| Docker Compose | Latest |
-| JUnit 5 | Latest |
-| Mockito | Latest |
+* BadRequestException
+* UnauthorizedException
+* ConflictException
+* NotFoundException
+* AccessDeniedException
 
 ---
 
@@ -95,6 +95,7 @@ MySQL
 ```text
 AuthController
 AuthService
+JwtService
 
 UserController
 UserService
@@ -105,9 +106,8 @@ TicketService
 TicketRepository
 
 SecurityConfig
-JwtService
-
 GlobalExceptionHandler
+DataInitializer
 ```
 
 ---
@@ -118,29 +118,37 @@ GlobalExceptionHandler
 
 Allowed Operations:
 
-- View own profile
-- Update own profile
-- Create tickets
-- View own tickets
+* Login
+* View own profile
+* Update own profile
+* Create tickets
+* View own tickets
+* View own ticket by ID
 
 ### AGENT
 
 Allowed Operations:
 
-- Create customers
-- View assigned customers
-- View assigned customer tickets
-- Update ticket status
+* Login
+* Create customers
+* View assigned customers
+* View assigned customer tickets
+* View assigned customer ticket by ID
+* Update ticket status for assigned customers
+* Update own profile
 
 ### ADMIN
 
 Allowed Operations:
 
-- View all customers
-- Create customers
-- View all tickets
-- Update ticket status
-- Assign tickets to agents
+* Login
+* View all customers
+* Create customers
+* View all tickets
+* View any ticket
+* Update ticket status
+* Assign tickets to agents
+* Update own profile
 
 ---
 
@@ -148,26 +156,46 @@ Allowed Operations:
 
 ### Users
 
-| Column | Type |
-|----------|----------|
-| id | BIGINT |
-| username | VARCHAR |
-| password | VARCHAR |
-| name | VARCHAR |
-| email | VARCHAR |
-| role | ENUM |
-| agent_id | BIGINT |
+| Column   | Description                 |
+| -------- | --------------------------- |
+| id       | User ID                     |
+| username | Unique username             |
+| password | BCrypt hashed password      |
+| name     | Full name                   |
+| email    | Unique email                |
+| role     | ADMIN / AGENT / CUSTOMER    |
+| agent_id | Assigned agent for customer |
 
 ### Tickets
 
-| Column | Type |
-|----------|----------|
-| id | BIGINT |
-| title | VARCHAR |
-| description | VARCHAR |
-| status | ENUM |
-| created_at | DATETIME |
-| customer_id | BIGINT |
+| Column      | Description                 |
+| ----------- | --------------------------- |
+| id          | Ticket ID                   |
+| title       | Ticket title                |
+| description | Ticket description          |
+| status      | OPEN / IN_PROGRESS / CLOSED |
+| created_at  | Creation timestamp          |
+| customer_id | Ticket owner                |
+
+---
+
+## Default Users
+
+The application creates the following users automatically on startup.
+
+### Admin
+
+```text
+username: admin
+password: admin123
+```
+
+### Agent
+
+```text
+username: agent
+password: agent123
+```
 
 ---
 
@@ -175,9 +203,11 @@ Allowed Operations:
 
 ### Login
 
-### Request
+```http
+POST /api/auth/login
+```
 
-POST `/api/auth/login`
+Request:
 
 ```json
 {
@@ -186,7 +216,7 @@ POST `/api/auth/login`
 }
 ```
 
-### Response
+Response:
 
 ```json
 {
@@ -197,18 +227,6 @@ POST `/api/auth/login`
 ---
 
 ## API Endpoints
-
-# Authentication
-
-### Login
-
-```http
-POST /api/auth/login
-```
-
----
-
-# Customers
 
 ### Create Customer
 
@@ -250,6 +268,11 @@ AGENT
 ADMIN
 ```
 
+Behavior:
+
+* ADMIN receives all customers
+* AGENT receives only assigned customers
+
 ---
 
 ### Get My Profile
@@ -283,8 +306,6 @@ ADMIN
 ```
 
 ---
-
-# Tickets
 
 ### Create Ticket
 
@@ -342,7 +363,7 @@ Optional filter:
 GET /api/tickets?status=OPEN
 ```
 
-Possible statuses:
+Supported statuses:
 
 ```text
 OPEN
@@ -352,7 +373,7 @@ CLOSED
 
 ---
 
-### Get Ticket By Id
+### Get Ticket By ID
 
 ```http
 GET /api/tickets/{id}
@@ -361,9 +382,16 @@ GET /api/tickets/{id}
 Roles:
 
 ```text
+CUSTOMER
 AGENT
 ADMIN
 ```
+
+Access Rules:
+
+* CUSTOMER can access only own tickets
+* AGENT can access only tickets of assigned customers
+* ADMIN can access any ticket
 
 ---
 
@@ -388,7 +416,7 @@ Request:
 }
 ```
 
-Possible values:
+Supported values:
 
 ```text
 OPEN
@@ -420,45 +448,45 @@ PUT /api/tickets/1/assign/2
 
 ## Exception Handling
 
-The application provides consistent error responses.
-
-Example:
+Example response:
 
 ```json
 {
-  "timestamp": "2026-06-19T22:23:16",
+  "timestamp": "2026-06-20T08:45:05",
   "status": 404,
   "message": "Ticket not found"
 }
 ```
 
-Supported errors:
+Supported status codes:
 
-| Status | Description |
-|----------|----------|
-| 400 | Bad Request |
-| 401 | Unauthorized |
-| 403 | Forbidden |
-| 404 | Not Found |
-| 409 | Conflict |
+| Status | Description  |
+| ------ | ------------ |
+| 200    | OK           |
+| 201    | Created      |
+| 400    | Bad Request  |
+| 401    | Unauthorized |
+| 403    | Forbidden    |
+| 404    | Not Found    |
+| 409    | Conflict     |
 
 ---
 
 ## Running Locally
 
-### Build
+Build:
 
 ```bash
 mvn clean package
 ```
 
-### Run
+Run:
 
 ```bash
 java -jar target/customer-support-hub-0.0.1-SNAPSHOT.jar
 ```
 
-Application:
+Application URL:
 
 ```text
 http://localhost:8080
@@ -468,19 +496,14 @@ http://localhost:8080
 
 ## Running With Docker
 
-### Build
+Build and Start:
 
 ```bash
-docker build -t customer-support-hub .
-```
-
-### Start
-
-```bash
+mvn clean package
 docker compose up -d --build
 ```
 
-### Verify
+Verify:
 
 ```bash
 docker compose ps
@@ -493,7 +516,7 @@ customer-support-app     Up
 customer-support-mysql   Up (healthy)
 ```
 
-### Stop
+Stop:
 
 ```bash
 docker compose down
@@ -506,53 +529,36 @@ docker compose down
 Run all tests:
 
 ```bash
-mvn test
+mvn clean test
 ```
 
-Current test coverage includes:
+Current tests cover:
 
-- UserService tests
-- TicketService tests
-- Security authorization tests
-- Spring context loading tests
+* UserService validation
+* TicketService business logic
+* Security authorization rules
+* Spring context loading
 
 ---
 
-## Design Decisions & Tradeoffs
+## Design Decisions
 
-### Chosen
-
-- Monolithic architecture
-- JWT-based authentication
-- MySQL relational database
-- Layered architecture
-- Hibernate automatic schema management
-
-### Not Implemented
-
-To keep the assignment focused and concise:
-
-- Refresh Tokens
-- Email Notifications
-- Audit Logging
-- Pagination
-- Integration Tests with Testcontainers
-- Swagger/OpenAPI
-- CI/CD Pipeline
+* Monolithic Spring Boot application
+* JWT-based authentication
+* Role-based authorization using Spring Security
+* MySQL relational database
+* Layered architecture
+* Centralized exception handling
+* Dockerized deployment
 
 ---
 
 ## Future Improvements
 
-- Swagger Documentation
-- Refresh Tokens
-- Pagination
-- Ticket Comments
-- Ticket Attachments
-- Audit Trail
-- Event Driven Architecture
-- Testcontainers Integration Tests
-- GitHub Actions CI/CD Pipeline
+* Pagination
+* Ticket comments
+* Additional authorization tests
+* API documentation
 
 ---
 
@@ -561,5 +567,3 @@ To keep the assignment focused and concise:
 Avihay Ben Ishay
 
 Backend Developer
-
-Java | Spring Boot | Microservices | Kafka | Docker | Kubernetes

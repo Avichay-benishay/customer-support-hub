@@ -59,6 +59,7 @@ public class SecurityConfig {
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
     }
+    
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
 
@@ -72,6 +73,7 @@ public class SecurityConfig {
 
         return converter;
     }
+    
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http

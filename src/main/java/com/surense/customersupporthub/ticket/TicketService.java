@@ -14,6 +14,7 @@ import com.surense.customersupporthub.ticket.dto.TicketResponse;
 import com.surense.customersupporthub.user.Role;
 import com.surense.customersupporthub.user.User;
 import com.surense.customersupporthub.user.UserRepository;
+import org.springframework.security.access.AccessDeniedException;
 
 @Service
 public class TicketService {
@@ -152,7 +153,7 @@ public class TicketService {
 
         if ("CUSTOMER".equals(role)) {
             if (!ticket.getCustomer().getId().equals(authenticatedUser.getId())) {
-                throw new UnauthorizedException("Access denied");
+            	throw new AccessDeniedException("Access denied");
             }
             return;
         }
@@ -162,12 +163,12 @@ public class TicketService {
 
             if (customer.getAgent() == null ||
                     !customer.getAgent().getId().equals(authenticatedUser.getId())) {
-                throw new UnauthorizedException("Access denied");
+            	throw new AccessDeniedException("Access denied");
             }
             return;
         }
 
-        throw new UnauthorizedException("Access denied");
+        throw new AccessDeniedException("Access denied");
     }
 
     private TicketResponse toResponse(Ticket ticket) {

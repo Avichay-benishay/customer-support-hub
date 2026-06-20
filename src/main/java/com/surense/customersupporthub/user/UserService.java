@@ -71,10 +71,16 @@ public class UserService {
             return agent;
         }
 
-        return userRepository.findByUsername(currentUsername)
+        User agent = userRepository.findByUsername(currentUsername)
                 .orElseThrow(() -> new UnauthorizedException("Authenticated user not found"));
-    }
 
+        if (agent.getRole() != Role.AGENT) {
+            throw new UnauthorizedException("Only agents can create customers");
+        }
+
+        return agent;
+    }
+    
     public List<UserResponse> getCustomers(String username, String role) {
 
         if ("ADMIN".equals(role)) {
