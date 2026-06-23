@@ -30,6 +30,7 @@ public class TicketService {
         this.userRepository = userRepository;
     }
 
+    @Transactional
     public TicketResponse createTicket(
             CreateTicketRequest request,
             String username) {
@@ -47,6 +48,7 @@ public class TicketService {
         return toResponse(ticketRepository.save(ticket));
     }
 
+    @Transactional(readOnly = true)
     public List<TicketResponse> getMyTickets(String username) {
 
         User customer = userRepository.findByUsername(username)
@@ -58,6 +60,7 @@ public class TicketService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public List<TicketResponse> getTickets(
             String username,
             String role,
