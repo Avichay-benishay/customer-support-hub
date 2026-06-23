@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.surense.customersupporthub.exception.BadRequestException;
 import com.surense.customersupporthub.exception.ConflictException;
@@ -25,6 +26,7 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    @Transactional
     public UserResponse createCustomer(
             CreateCustomerRequest request,
             String currentUsername,
@@ -80,7 +82,8 @@ public class UserService {
 
         return agent;
     }
-    
+
+    @Transactional(readOnly = true)
     public List<UserResponse> getCustomers(String username, String role) {
 
         if ("ADMIN".equals(role)) {
@@ -99,6 +102,7 @@ public class UserService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public UserResponse getMyProfile(String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UnauthorizedException("Authenticated user not found"));
@@ -106,6 +110,7 @@ public class UserService {
         return toResponse(user);
     }
 
+    @Transactional
     public UserResponse updateMyProfile(
             String username,
             UpdateProfileRequest request) {
